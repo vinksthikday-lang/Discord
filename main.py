@@ -15,20 +15,16 @@ load_dotenv()
 TOKEN = os.getenv('DISCORD_TOKEN')
 WEB_SERVER_URL = "https://web-production-1e3ff.up.railway.app"
 
-# 🔊 VC Auto-Join Settings
-TARGET_GUILD_ID = 1200387647512776704
-TARGET_VC_ID = 1369215818533044254
+# Store obfuscated files temporarily
+pending_files = {}  # {filename: content}
 
 pending_verifications = {}
-
 THINKING_GIF = "https://images-ext-1.discordapp.net/external/2U1ZJ95fRO8U9EVviVdko6MPezQmT4CNEDmTJwpajN4/https/media.tenor.com/oJKQsEPQrYIAAAPo/spongebob-spongebob-squarepants.mp4"
 CONFETTI_GIF = "https://images-ext-1.discordapp.net/external/A0IKh3A9qPmAFR-Iu7U1Vt_3yoGpoLSnnpkeEmt31H0/https/media.tenor.com/JNM7NAie5dUAAAPo/stop-it-oh.mp4"
 WARNING_GIF = "https://images-ext-1.discordapp.net/external/Ftd_ZW7H-1KGCTqeC0LdZffzX6N4hplNvHU7D4T28cI/https/media.tenor.com/piCXvK3ABIUAAAPo/be-doo-be-doo-minion.mp4"
 
 intents = discord.Intents.default()
 intents.message_content = True
-intents.guilds = True
-intents.voice_states = True
 bot = commands.Bot(command_prefix="!", intents=intents, help_command=None)
 
 def log_request(user_id, filename, status):
@@ -51,6 +47,34 @@ def detect_language_from_content(code: str) -> str:
         return '.py'
     else:
         return '.lua'
+
+# Add route to serve obfuscated files
+import urllib.parse
+from flask import send_file as flask_send_file
+
+# We'll add a new route in webserver.py — but for now, we'll use a simple method
+# Since we can't easily serve files from Discord bot, we'll embed the code in a message if small,
+# or instruct user to check web server (but that's complex).
+# Instead, we'll use a simpler approach: send code in a message if < 100KB, else warn.
+
+async def send_obfuscated_content(message, obfuscated_code, filename):
+    """Send obfuscated code as message or warn if too large"""
+    if len(obfuscated_code) < 100000:  # 100KB
+        # Send as code block
+        ext = os.path.splitext(filename)[1][1:] or "txt"
+        await message.channel.send(
+            f"✅ Obfuscated file `{filename}` ready!\n"
+            f"```{ext}\n{obfuscated_code[:19000]}\n```"
+        )
+        if len(obfuscated_code) > 19000:
+            await message.channel.send("⚠️ Code truncated (Discord limit). Use a real obfuscator for large scripts.")
+    else:
+        # For large files, we'd need a file server — but Railway bot can't serve files easily
+        # So we warn the user
+        await message.channel.send(
+            "📦 Your obfuscated script is large!\n"
+            "💡 Tip: Split it into smaller files or use a local obfuscator."
+        )
 
 async def simulate_progress(message, steps=4):
     emojis = ["🔄", "🌀", "⏳", "🛡️"]
@@ -79,20 +103,13 @@ async def on_ready():
     print(f"✅ {bot.user} is online!")
     print(f"🌐 Web server: {WEB_SERVER_URL}")
     
-    # 🔊 Auto-join VC
-    guild = bot.get_guild(TARGET_GUILD_ID)
-    if guild:
-        vc_channel = guild.get_channel(TARGET_VC_ID)
-        if vc_channel and isinstance(vc_channel, discord.VoiceChannel):
-            try:
-                await vc_channel.connect()
-                print(f"🔊 Joined VC: {vc_channel.name} in {guild.name}")
-            except Exception as e:
-                print(f"⚠️ Failed to join VC: {e}")
-        else:
-            print("❌ VC channel not found or invalid")
-    else:
-        print("❌ Target server not found")
+    # Set a helpful status (no VC needed)
+    await bot.change_presence(
+        activity=discord.Activity(
+            type=discord.ActivityType.WATCHING,
+            name="DMs for obfuscation ❤️"
+        )
+    )
     
     if should_restart():
         print("🔄 Weekly auto-restart triggered.")
@@ -111,7 +128,7 @@ async def help_command(ctx):
         value="1. Attach a `.lua`, `.py`, or `.txt` file\n"
               "2. Click the verification link\n"
               "3. Complete captcha → reply `done`\n"
-              "4. Get your protected file!",
+              "4. Get your protected code!",
         inline=False
     )
     embed.add_field(
@@ -127,10 +144,8 @@ async def help_command(ctx):
 
 @bot.event
 async def on_message(message):
-    # 🔒 IGNORE ALL MESSAGES IN SERVERS — ONLY PROCESS DMs
     if not isinstance(message.channel, discord.DMChannel):
-        return  # Silently ignore server messages
-
+        return
     if message.author.bot:
         return
 
@@ -138,7 +153,6 @@ async def on_message(message):
         await bot.process_commands(message)
         return
 
-    # Handle "done" response
     if message.content.strip().lower() == "done":
         user_id = message.author.id
         if user_id not in pending_verifications:
@@ -153,24 +167,19 @@ async def on_message(message):
         attachment, filename, level, ext = pending_verifications.pop(user_id)
         progress_msg = await simulate_progress(message)
 
-        temp_in = temp_out = None
+        temp_in = None
         try:
             with tempfile.NamedTemporaryFile(delete=False) as tmp:
                 temp_in = tmp.name
                 await attachment.save(tmp.name)
 
             code = safe_read_file(temp_in)
-
             loop = asyncio.get_event_loop()
+            
             if ext == '.lua':
                 obfuscated = await loop.run_in_executor(None, LuaObfuscator(code, level).obfuscate)
             else:
                 obfuscated = await loop.run_in_executor(None, PythonObfuscator(code, level).obfuscate)
-
-            output_name = f"KoalaObf_{filename}"
-            with tempfile.NamedTemporaryFile(delete=False, suffix=ext) as tmp_out:
-                temp_out = tmp_out.name
-                tmp_out.write(obfuscated.encode('utf-8'))
 
             success_embed = discord.Embed(
                 title="✅ Obfuscation Complete!",
@@ -179,7 +188,9 @@ async def on_message(message):
             )
             success_embed.set_image(url=CONFETTI_GIF)
             await progress_msg.edit(embed=success_embed)
-            await message.channel.send(file=discord.File(temp_out, filename=output_name))
+            
+            # Send obfuscated code
+            await send_obfuscated_content(message, obfuscated, filename)
             log_request(user_id, filename, f"SUCCESS_{level.upper()}")
 
         except Exception as e:
@@ -192,13 +203,11 @@ async def on_message(message):
             await progress_msg.edit(embed=error_embed)
             log_request(user_id, filename, "ERROR")
         finally:
-            for f in [temp_in, temp_out]:
-                if f and os.path.exists(f):
-                    try: os.unlink(f)
-                    except: pass
+            if temp_in and os.path.exists(temp_in):
+                try: os.unlink(temp_in)
+                except: pass
         return
 
-    # Handle file upload (DMs only)
     has_file = len(message.attachments) > 0
     if not has_file:
         embed = discord.Embed(
