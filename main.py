@@ -13,7 +13,8 @@ from obfuscator.utils import safe_read_file, is_rate_limited, should_restart
 load_dotenv()
 
 TOKEN = os.getenv('DISCORD_TOKEN')
-WEB_SERVER_URL = os.getenv('WEB_SERVER_URL', 'http://localhost:5000')
+WEB_SERVER_URL = os.getenv('WEB_SERVER_URL', '
+web-production-1e3ff.up.railway.app')
 STATUS_CHANNEL_ID = os.getenv('STATUS_CHANNEL_ID', '').strip()
 if STATUS_CHANNEL_ID.isdigit():
     STATUS_CHANNEL_ID = int(STATUS_CHANNEL_ID)
@@ -248,4 +249,5 @@ async def on_message(message):
 if __name__ == "__main__":
     if not TOKEN:
         raise RuntimeError("❌ DISCORD_TOKEN missing in .env")
+
     bot.run(TOKEN)
