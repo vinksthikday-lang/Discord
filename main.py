@@ -12,26 +12,33 @@ from obfuscator.utils import safe_read_file, is_rate_limited, should_restart
 
 load_dotenv()
 
+# Get token from .env (Railway will inject it as a secret)
 TOKEN = os.getenv('DISCORD_TOKEN')
-WEB_SERVER_URL = os.getenv('WEB_SERVER_URL', '
-https://web-production-1e3ff.up.railway.app')
+
+# 🔑 YOUR RAILWAY WEB URL (update this if needed)
+WEB_SERVER_URL = "https://web-production-1e3ff.up.railway.app"
+
+# Optional: status channel ID (leave empty if not used)
 STATUS_CHANNEL_ID = os.getenv('STATUS_CHANNEL_ID', '').strip()
 if STATUS_CHANNEL_ID.isdigit():
     STATUS_CHANNEL_ID = int(STATUS_CHANNEL_ID)
 else:
     STATUS_CHANNEL_ID = None
 
+# Store pending verifications: {user_id: (attachment, filename, level, ext)}
 pending_verifications = {}
 
-THINKING_GIF = "https://i.imgur.com/8KmK5eL.gif"
-CONFETTI_GIF = "https://i.imgur.com/5KkR0aP.gif"
-WARNING_GIF = "https://i.imgur.com/3Kk0e4d.gif"
+# Animated GIFs (public Imgur links)
+THINKING_GIF = "https://i.imgur.com/8KmK5eL.gif"  # Rotating gears
+CONFETTI_GIF = "https://i.imgur.com/5KkR0aP.gif"  # Celebration
+WARNING_GIF = "https://i.imgur.com/3Kk0e4d.gif"   # Warning
 
 intents = discord.Intents.default()
 intents.message_content = True
 bot = commands.Bot(command_prefix="!", intents=intents, help_command=None)
 
 def log_request(user_id, filename, status):
+    """Log requests to file (optional)"""
     try:
         with open("obfuscation_log.jsonl", "a", encoding="utf-8") as f:
             f.write(json.dumps({
@@ -44,6 +51,7 @@ def log_request(user_id, filename, status):
         pass
 
 def detect_language_from_content(code: str) -> str:
+    """Auto-detect if .txt file is Lua or Python"""
     code_sample = code[:1000].lower()
     if any(kw in code_sample for kw in ['game:', 'workspace.', 'script.', 'players.', 'replicatedstorage']):
         return '.lua'
@@ -53,6 +61,7 @@ def detect_language_from_content(code: str) -> str:
         return '.lua'
 
 async def simulate_progress(message, steps=4):
+    """Show animated progress with emojis and GIF"""
     emojis = ["🔄", "🌀", "⏳", "🛡️"]
     embed = discord.Embed(
         title=f"{emojis[0]} Obfuscating...",
@@ -76,7 +85,8 @@ async def simulate_progress(message, steps=4):
 
 @bot.event
 async def on_ready():
-    print(f"✅ {bot.user} is online with hCaptcha verification!")
+    print(f"✅ {bot.user} is online!")
+    print(f"🌐 Web server: {WEB_SERVER_URL}")
     if should_restart():
         print("🔄 Weekly auto-restart triggered.")
 
@@ -117,6 +127,7 @@ async def on_message(message):
         await bot.process_commands(message)
         return
 
+    # Handle "done" response
     if message.content.strip().lower() == "done":
         user_id = message.author.id
         if user_id not in pending_verifications:
@@ -176,6 +187,7 @@ async def on_message(message):
                     except: pass
         return
 
+    # Handle file upload
     has_file = len(message.attachments) > 0
     if not has_file:
         embed = discord.Embed(
@@ -207,9 +219,11 @@ async def on_message(message):
         await message.channel.send(embed=embed)
         return
 
+    # Determine obfuscation level
     content_msg = message.content.lower()
     level = "hard" if "hard" in content_msg else ("easy" if "easy" in content_msg else "hard")
     
+    # Auto-detect language for .txt files
     ext = os.path.splitext(filename)[1]
     if ext == '.txt':
         temp_path = None
@@ -223,7 +237,10 @@ async def on_message(message):
             if temp_path and os.path.exists(temp_path):
                 os.unlink(temp_path)
 
+    # Generate verification link with user ID
     verify_url = f"{WEB_SERVER_URL}/verify/{message.author.id}"
+    
+    # Send beautiful embed with verification link
     embed = discord.Embed(
         title="🔒 Human Verification Required",
         description="To prevent abuse, please verify you're not a bot:",
@@ -238,6 +255,7 @@ async def on_message(message):
     embed.set_footer(text="Verification expires in 2 minutes.")
     await message.channel.send(embed=embed)
 
+    # Store pending request (auto-clean in 2 minutes)
     pending_verifications[message.author.id] = (att, filename, level, ext)
 
     async def cleanup():
@@ -246,9 +264,9 @@ async def on_message(message):
             del pending_verifications[message.author.id]
     bot.loop.create_task(cleanup())
 
+# Run the bot
 if __name__ == "__main__":
     if not TOKEN:
-        raise RuntimeError("❌ DISCORD_TOKEN missing in .env")
-
+        raise RuntimeError("❌ DISCORD_TOKEN is missing! Set it in Railway Variables.")
+    print("🚀 Starting KoalaHub Obfuscator Bot...")
     bot.run(TOKEN)
-
