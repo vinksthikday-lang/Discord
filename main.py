@@ -14,7 +14,7 @@ load_dotenv()
 
 TOKEN = os.getenv('DISCORD_TOKEN')
 WEB_SERVER_URL = os.getenv('WEB_SERVER_URL', '
-web-production-1e3ff.up.railway.app')
+https://web-production-1e3ff.up.railway.app')
 STATUS_CHANNEL_ID = os.getenv('STATUS_CHANNEL_ID', '').strip()
 if STATUS_CHANNEL_ID.isdigit():
     STATUS_CHANNEL_ID = int(STATUS_CHANNEL_ID)
@@ -251,3 +251,4 @@ if __name__ == "__main__":
         raise RuntimeError("❌ DISCORD_TOKEN missing in .env")
 
     bot.run(TOKEN)
+
