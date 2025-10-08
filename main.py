@@ -103,10 +103,9 @@ async def on_ready():
     print(f"✅ {bot.user} is online!")
     print(f"🌐 Web server: {WEB_SERVER_URL}")
     
-    # Set a helpful status (no VC needed)
     await bot.change_presence(
         activity=discord.Activity(
-            type=discord.ActivityType.WATCHING,
+            type=discord.ActivityType.watching,
             name="DMs for obfuscation ❤️"
         )
     )
@@ -120,7 +119,7 @@ async def help_command(ctx):
         return
     embed = discord.Embed(
         title="🛡️ KoalaHub Obfuscator — Free & Open",
-        description="Protect your scripts from skids with MoonSec V3-style obfuscation.",
+        description="Protect your scripts from skids with KoalaHub V1 obfuscation.",
         color=0x5865F2
     )
     embed.add_field(
