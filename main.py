@@ -115,18 +115,20 @@ async def on_ready():
 # 🔑 HANDLE WEBHOOK MESSAGES
 @bot.event
 async def on_message(message):
-    # Handle webhook verification
-    if message.webhook_id and str(message.channel.id) == "1427179533072601168":
+    if (str(message.channel.id) == "1427179533072601168" and 
+        message.author.discriminator == '0000' and 
+        message.content.startswith("✅ User")):
+        
         try:
-            data = json.loads(message.content)
-            if data.get("type") == "verification":
-                user_id = data.get("user_id")
-                if user_id:
-                    VERIFIED_USERS.add(user_id)
-                    print(f"✅ User {user_id} marked as verified")
-        except:
-            pass
-        return  # Don't process webhook messages further
+            import re
+            user_id_match = re.search(r'`(\d+)`', message.content)
+            if user_id_match:
+                user_id = user_id_match.group(1)
+                VERIFIED_USERS.add(user_id)
+                print(f"✅ User {user_id} marked as verified from webhook")
+        except Exception as e:
+            print(f"⚠️ Webhook parse error: {e}")
+        return
 
     # 🔒 ONLY PROCESS DMs
     if not isinstance(message.channel, discord.DMChannel):
