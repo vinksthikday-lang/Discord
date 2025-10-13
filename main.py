@@ -15,13 +15,17 @@ load_dotenv()
 TOKEN = os.getenv('DISCORD_TOKEN')
 WEB_SERVER_URL = "https://web-production-1e3ff.up.railway.app"
 
+# Store verified users (in memory)
+VERIFIED_USERS = set()
+
 pending_verifications = {}
-THINKING_GIF = "https://tenor.com/view/spongebob-spongebob-squarepants-think-thinking-hmm-gif-11570469479394618754"
-CONFETTI_GIF = "https://tenor.com/view/stop-it-oh-spongebob-confetti-gif-13772176"
-WARNING_GIF = "https://tenor.com/view/be-doo-be-doo-minion-despicable-me-alert-warning-gif-11970734646175466629"
+THINKING_GIF = "https://i.imgur.com/8KmK5eL.gif"
+CONFETTI_GIF = "https://i.imgur.com/5KkR0aP.gif"
+WARNING_GIF = "https://i.imgur.com/3Kk0e4d.gif"
 
 intents = discord.Intents.default()
 intents.message_content = True
+intents.guilds = True
 bot = commands.Bot(command_prefix="!", intents=intents, help_command=None)
 
 def log_request(user_id, filename, status):
@@ -46,7 +50,6 @@ def detect_language_from_content(code: str) -> str:
         return '.lua'
 
 async def send_obfuscated_content(message, obfuscated_code, filename):
-    """Send obfuscated code as a downloadable file attachment"""
     temp_path = None
     try:
         ext = os.path.splitext(filename)[1]
@@ -99,7 +102,6 @@ async def on_ready():
     print(f"✅ {bot.user} is online!")
     print(f"🌐 Web server: {WEB_SERVER_URL}")
     
-    # ✅ FIXED: lowercase 'watching'
     await bot.change_presence(
         activity=discord.Activity(
             type=discord.ActivityType.watching,
@@ -110,58 +112,80 @@ async def on_ready():
     if should_restart():
         print("🔄 Weekly auto-restart triggered.")
 
-@bot.command(name='help')
-async def help_command(ctx):
-    if not isinstance(ctx.channel, discord.DMChannel):
-        return
-    embed = discord.Embed(
-        title="🛡️ KoalaHub Obfuscator — Free & Open",
-        description="Protect your scripts from skids with KoalaHub V1 obfuscation.",
-        color=0x5865F2
-    )
-    embed.add_field(
-        name="📥 How to Use",
-        value="1. Attach a `.lua`, `.py`, or `.txt` file\n"
-              "2. Click the verification link\n"
-              "3. Complete captcha → reply `done`\n"
-              "4. Get your protected file!",
-        inline=False
-    )
-    embed.add_field(
-        name="✨ Features",
-        value="• Roblox & Termux compatible\n"
-              "• Real hCaptcha verification\n"
-              "• Polymorphic, anti-debug, anti-tamper\n"
-              "• No user restrictions — for everyone!",
-        inline=False
-    )
-    embed.set_footer(text="Made with ❤️ — no greed, just great protection.")
-    await ctx.send(embed=embed)
-
+# 🔑 HANDLE WEBHOOK MESSAGES
 @bot.event
 async def on_message(message):
-    # 🔒 ONLY PROCESS DMs — IGNORE ALL SERVER MESSAGES
+    # Handle webhook verification
+    if message.webhook_id and str(message.channel.id) == "1427179533072601168":
+        try:
+            data = json.loads(message.content)
+            if data.get("type") == "verification":
+                user_id = data.get("user_id")
+                if user_id:
+                    VERIFIED_USERS.add(user_id)
+                    print(f"✅ User {user_id} marked as verified")
+        except:
+            pass
+        return  # Don't process webhook messages further
+
+    # 🔒 ONLY PROCESS DMs
     if not isinstance(message.channel, discord.DMChannel):
         return
     if message.author.bot:
         return
 
     if message.content.startswith('!help'):
-        await bot.process_commands(message)
+        embed = discord.Embed(
+            title="🛡️ KoalaHub Obfuscator — Free & Open",
+            description="Protect your scripts from skids with MoonSec V3-style obfuscation.",
+            color=0x5865F2
+        )
+        embed.add_field(
+            name="📥 How to Use",
+            value="1. Attach a `.lua`, `.py`, or `.txt` file\n"
+                  "2. Click the verification link\n"
+                  "3. Complete captcha → reply `done`\n"
+                  "4. Get your protected file!",
+            inline=False
+        )
+        embed.add_field(
+            name="✨ Features",
+            value="• Roblox & Termux compatible\n"
+                  "• Real hCaptcha verification\n"
+                  "• Polymorphic, anti-debug, anti-tamper\n"
+                  "• No user restrictions — for everyone!",
+            inline=False
+        )
+        embed.set_footer(text="Made with ❤️ — no greed, just great protection.")
+        await message.channel.send(embed=embed)
         return
 
     if message.content.strip().lower() == "done":
-        user_id = message.author.id
-        if user_id not in pending_verifications:
+        user_id = str(message.author.id)
+        
+        # 🔑 REAL VALIDATION: Check if user solved hCaptcha
+        if user_id not in VERIFIED_USERS:
             embed = discord.Embed(
-                title="❌ No Active Verification",
-                description="Complete the captcha first, then reply with `done`.",
+                title="❌ Verification Required",
+                description="You must complete the hCaptcha challenge first.\nClick the verification link and solve it!",
                 color=0xED4245
             )
             await message.channel.send(embed=embed)
             return
 
-        attachment, filename, level, ext = pending_verifications.pop(user_id)
+        if message.author.id not in pending_verifications:
+            embed = discord.Embed(
+                title="❌ No Active Request",
+                description="Send a file first, then complete verification.",
+                color=0xED4245
+            )
+            await message.channel.send(embed=embed)
+            return
+
+        attachment, filename, level, ext = pending_verifications.pop(message.author.id)
+        # Remove from verified set (optional)
+        VERIFIED_USERS.discard(user_id)
+        
         progress_msg = await simulate_progress(message)
 
         temp_in = None
@@ -186,9 +210,8 @@ async def on_message(message):
             success_embed.set_image(url=CONFETTI_GIF)
             await progress_msg.edit(embed=success_embed)
             
-            # ✅ SEND AS DOWNLOADABLE FILE
             await send_obfuscated_content(message, obfuscated, filename)
-            log_request(user_id, filename, f"SUCCESS_{level.upper()}")
+            log_request(message.author.id, filename, f"SUCCESS_{level.upper()}")
 
         except Exception as e:
             error_embed = discord.Embed(
@@ -198,7 +221,7 @@ async def on_message(message):
             )
             error_embed.set_image(url=WARNING_GIF)
             await progress_msg.edit(embed=error_embed)
-            log_request(user_id, filename, "ERROR")
+            log_request(message.author.id, filename, "ERROR")
         finally:
             if temp_in and os.path.exists(temp_in):
                 try: os.unlink(temp_in)
@@ -277,6 +300,6 @@ async def on_message(message):
 
 if __name__ == "__main__":
     if not TOKEN:
-        raise RuntimeError("❌ DISCORD_TOKEN is missing! Set it in Railway Variables.")
+        raise RuntimeError("❌ DISCORD_TOKEN is missing!")
     print("🚀 Starting KoalaHub Obfuscator Bot...")
     bot.run(TOKEN)
