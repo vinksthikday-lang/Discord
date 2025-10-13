@@ -129,7 +129,7 @@ def verify_page(user_id):
 def verify():
     try:
         data = request.get_json()
-        if not data:  # ✅ FIXED: was "if not"
+        if not data:
             return jsonify({"success": False}), 400
 
         token = data.get('token')
@@ -149,11 +149,18 @@ def verify():
             
             if WEBHOOK_URL:
                 try:
-                    webhook_data = {"type": "verification", "user_id": str(user_id)}
-                    requests.post(WEBHOOK_URL, json=webhook_data, timeout=5)
-                    print(f"📤 Webhook sent for user {user_id}")
+                    webhook_data = {
+                        "content": f"✅ User `{user_id}` verified hCaptcha.",
+                        "username": "KoalaHub Security",
+                        "avatar_url": "https://cdn.corenexis.com/files/b/7465723168.png"
+                    }
+                    response = requests.post(WEBHOOK_URL, json=webhook_data, timeout=5)
+                    if response.status_code == 204:
+                        print(f"✅ Webhook delivered for user {user_id}")
+                    else:
+                        print(f"❌ Webhook failed: {response.status_code}")
                 except Exception as e:
-                    print(f"⚠️ Webhook failed: {e}")
+                    print(f"⚠️ Webhook exception: {e}")
             
             return jsonify({"success": True})
         else:
