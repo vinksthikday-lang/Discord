@@ -4,7 +4,7 @@ import requests
 
 app = Flask(__name__)
 
-HCAPTCHA_SITE_KEY = os.getenv('HCAPTCHA_SITE_KEY', '24446f26-30f4-43e4-8756-185c5426fcba')
+HCAPTCHA_SITE_KEY = os.getenv('HCAPTCHA_SITE_KEY', 'f7e046de-b060-4aa8-9176-a826bdea13be')
 HCAPTCHA_SECRET_KEY = os.getenv('HCAPTCHA_SECRET_KEY', 'ES_3b42d6a2578947ad95c16fdac78c5d')
 WEBHOOK_URL = os.getenv('DISCORD_BOT_WEBHOOK_URL', '')
 
