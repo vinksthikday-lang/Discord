@@ -19,9 +19,9 @@ WEB_SERVER_URL = "https://web-production-1e3ff.up.railway.app"
 VERIFIED_USERS = set()
 
 pending_verifications = {}
-THINKING_GIF = "https://i.imgur.com/8KmK5eL.gif"
-CONFETTI_GIF = "https://i.imgur.com/5KkR0aP.gif"
-WARNING_GIF = "https://i.imgur.com/3Kk0e4d.gif"
+THINKING_GIF = "https://tenor.com/view/spongebob-spongebob-squarepants-think-thinking-hmm-gif-11570469479394618754"
+CONFETTI_GIF = "https://tenor.com/view/stop-it-oh-spongebob-confetti-gif-13772176"
+WARNING_GIF = "https://tenor.com/view/be-doo-be-doo-minion-despicable-me-alert-warning-gif-11970734646175466629"
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -137,7 +137,7 @@ async def on_message(message):
     if message.content.startswith('!help'):
         embed = discord.Embed(
             title="🛡️ KoalaHub Obfuscator — Free & Open",
-            description="Protect your scripts from skids with MoonSec V3-style obfuscation.",
+            description="Protect your scripts from skids with KoalaHub V1 obfuscation.",
             color=0x5865F2
         )
         embed.add_field(

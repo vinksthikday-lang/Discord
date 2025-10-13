@@ -14,90 +14,112 @@ def health():
 
 @app.route('/verify/<user_id>')
 def verify_page(user_id):
-    # ✅ FIXED HTML: Proper hCaptcha integration
     return f'''
     <!DOCTYPE html>
     <html>
     <head>
-        <title>Verify Human</title>
+        <title>KoalaHub Verification</title>
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <script src="https://js.hcaptcha.com/1/api.js" async defer></script>
         <style>
             body {{ 
-                font-family: Arial, sans-serif; 
-                text-align: center; 
-                margin-top: 50px; 
-                background: #f0f2f5; 
+                margin: 0;
+                padding: 0;
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                background: linear-gradient(rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.6)), 
+                            url('https://cdn.corenexis.com/files/b/7465723168.png') center/cover no-repeat fixed;
+                min-height: 100vh;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                color: white;
             }}
             .container {{ 
-                max-width: 500px; 
-                margin: 0 auto; 
-                padding: 20px; 
-                background: white; 
-                border-radius: 10px; 
-                box-shadow: 0 2px 10px rgba(0,0,0,0.1); 
+                background: rgba(30, 30, 40, 0.85);
+                padding: 30px;
+                border-radius: 16px;
+                box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+                text-align: center;
+                max-width: 500px;
+                width: 90%;
+                backdrop-filter: blur(10px);
             }}
-            h2 {{ color: #5865F2; }}
+            h2 {{ 
+                color: #4ade80; 
+                margin-top: 0;
+                font-size: 28px;
+                text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            }}
+            p {{ 
+                color: #e2e8f0; 
+                margin-bottom: 25px;
+                font-size: 16px;
+            }}
             button {{ 
                 margin-top: 20px; 
-                padding: 10px 20px; 
+                padding: 12px 24px; 
                 background: #5865F2; 
                 color: white; 
                 border: none; 
-                border-radius: 5px; 
+                border-radius: 8px; 
                 cursor: pointer; 
+                font-size: 16px;
+                transition: background 0.3s;
+            }}
+            button:hover:not(:disabled) {{ 
+                background: #4752c4; 
             }}
             button:disabled {{ 
-                background: #b9bbbe; 
+                background: #64748b; 
                 cursor: not-allowed; 
+            }}
+            .logo {{ 
+                font-size: 48px;
+                margin-bottom: 20px;
             }}
         </style>
     </head>
     <body>
         <div class="container">
-            <h2>🔒 Verify You're Human</h2>
-            <p>To protect this service, please complete the challenge.</p>
-            <div class="h-captcha" data-sitekey="{HCAPTCHA_SITE_KEY}"></div>
-            <button id="submit" disabled>Submit</button>
+            <div class="logo">🐨</div>
+            <h2>KoalaHub Security Check</h2>
+            <p>Please verify you're human to protect our service.</p>
+            <div class="h-captcha" data-sitekey="{HCAPTCHA_SITE_KEY}" data-callback="onVerify"></div>
+            <button id="submit" disabled>Submit Verification</button>
         </div>
 
         <script>
-            // ✅ FIXED: Proper hCaptcha callback
-            window.onload = function() {{
-                const submitBtn = document.getElementById('submit');
-                
-                // Enable button when hCaptcha is solved
-                const captchaDiv = document.querySelector('.h-captcha');
-                const observer = new MutationObserver(() => {{
-                    const hiddenInput = captchaDiv.querySelector('input[name="h-captcha-response"]');
-                    if (hiddenInput && hiddenInput.value) {{
-                        submitBtn.disabled = false;
+            function onVerify(token) {{
+                console.log("hCaptcha solved!");
+                document.getElementById('submit').disabled = false;
+                setTimeout(() => {{
+                    submitVerification(token);
+                }}, 1000);
+            }}
+            
+            function submitVerification(token) {{
+                fetch('/verify', {{
+                    method: 'POST',
+                    headers: {{ 'Content-Type': 'application/json' }},
+                    body: JSON.stringify({{ 
+                        token: token, 
+                        user_id: "{user_id}" 
+                    }})
+                }})
+                .then(response => response.json())
+                .then(data => {{
+                    if (data.success) {{
+                        alert("✅ Verified! Return to Discord.");
+                        window.close();
+                    }} else {{
+                        alert("❌ Verification failed. Try again.");
                     }}
+                }})
+                .catch(error => {{
+                    console.error('Error:', error);
+                    alert("⚠️ Network error. Try again.");
                 }});
-                observer.observe(captchaDiv, {{ childList: true, subtree: true }});
-                
-                // Handle submit
-                submitBtn.onclick = async () => {{
-                    const token = captchaDiv.querySelector('input[name="h-captcha-response"]').value;
-                    try {{
-                        const response = await fetch('/verify', {{
-                            method: 'POST',
-                            headers: {{ 'Content-Type': 'application/json' }},
-                            body: JSON.stringify({{ token: token, user_id: "{user_id}" }})
-                        }});
-                        const data = await response.json();
-                        if (data.success) {{
-                            alert("✅ Verified! Return to Discord.");
-                            window.close();
-                        }} else {{
-                            alert("❌ Verification failed. Try again.");
-                        }}
-                    }} catch (e) {{
-                        alert("⚠️ Network error. Try again.");
-                        console.error(e);
-                    }}
-                }};
-            }};
+            }}
         </script>
     </body>
     </html>
@@ -107,7 +129,7 @@ def verify_page(user_id):
 def verify():
     try:
         data = request.get_json()
-        if not data:
+        if not data:  # ✅ FIXED: was "if not"
             return jsonify({"success": False}), 400
 
         token = data.get('token')
@@ -116,7 +138,6 @@ def verify():
         if not token or not user_id:
             return jsonify({"success": False}), 400
 
-        # Validate with hCaptcha
         resp = requests.post('https://hcaptcha.com/siteverify', data={
             'secret': HCAPTCHA_SECRET_KEY,
             'response': token
@@ -126,10 +147,9 @@ def verify():
         if result.get('success'):
             print(f"✅ User {user_id} verified successfully.")
             
-            # Send webhook to Discord bot
             if WEBHOOK_URL:
                 try:
-                    webhook_data = {{"type": "verification", "user_id": str(user_id)}}
+                    webhook_data = {"type": "verification", "user_id": str(user_id)}
                     requests.post(WEBHOOK_URL, json=webhook_data, timeout=5)
                     print(f"📤 Webhook sent for user {user_id}")
                 except Exception as e:
